@@ -1,6 +1,10 @@
 # Build folder
+<<<<<<< HEAD
 build/
 # Resources folder
 resources/
+build
+cmake-build-debug
+.idea
 # Local files
 *.local.*
