@@ -33,6 +33,7 @@ Compile the proto objects:
 To run the executable:
 ```shell
 mkdir build
+cd build
 cmake ..
 make run
 cd ..
