@@ -1,5 +1,4 @@
 # Build folder
-<<<<<<< HEAD
 build/
 # Resources folder
 resources/
@@ -8,3 +7,9 @@ cmake-build-debug
 .idea
 # Local files
 *.local.*
+# Visual Studio Code folder
+.vscode
+
+# To be deleted when we finalize the way to compile files.
+*.o
+src/pointestimates/lossfunction/loss
