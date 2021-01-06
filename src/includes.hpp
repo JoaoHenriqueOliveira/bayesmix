@@ -16,5 +16,9 @@
 #include "utils/cluster_utils.hpp"
 #include "utils/io_utils.hpp"
 #include "utils/proto_utils.hpp"
+#include "pointestimates/clustering/ClusteringProcess.hpp"
+#include "pointestimates/lossfunction/BinderLoss.hpp"
+#include "pointestimates/lossfunction/LossFunction.hpp"
+
 
 #endif  // BAYESMIX_INCLUDES_HPP_
