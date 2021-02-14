@@ -17,7 +17,7 @@ class CredibleBall {
   LossFunction* loss_function;     // metric to compute the region
   Eigen::MatrixXi mcmc_sample;     // MCMC matrix of clusters
   Eigen::VectorXi point_estimate;  // output of the greedy algorithm
-  Eigen::MatrixXd credibleBall;  // set of clusters inside the credible region
+  Eigen::MatrixXi credibleBall;  // set of clusters inside the credible region
   int T;                         // number of clusters, ie mcmc_sample.rows
   int N;                         // dimension of cluster, ie mcmc_sample.cols
   double alpha;                  // level of the credible ball region
@@ -27,12 +27,13 @@ class CredibleBall {
   CredibleBall(LOSS_FUNCTION loss_type_, Eigen::MatrixXi& mcmc_sample_,
                double alpha_, Eigen::VectorXi& point_estimate_);
   ~CredibleBall();
-  double calculateRegion(double rate);  // calculate the radius
-  Eigen::MatrixXd VerticalUpperBound();
-  Eigen::MatrixXd VerticalLowerBound();
-  Eigen::MatrixXd HorizontalBound();
+  double calculateRegion(double rate);   // calculate the radius
+  Eigen::VectorXi VerticalUpperBound();  // index of cluusters of the VUB
+  Eigen::MatrixXd VerticalLowerBound();  // index of the clusters of the VLB
+  Eigen::VectorXi HorizontalBound();     // index of the clusters of the HB
 
  private:
   void populateCredibleSet();  // populate the credibleBall
+  int count_cluster_row(int index);
 };
 #endif  // CREDIBLE_BALL_HPP
