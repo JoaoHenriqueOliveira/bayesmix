@@ -61,22 +61,23 @@ CredibleBall::~CredibleBall() {
 }
 
 double CredibleBall::calculateRegion(double rate) {
-  double epsilon = 0.0;
+  double epsilon = 1.0;
   double probability = 0.0;
-  int steps = 1;
+  double steps = 1;
   loss_function->SetFirstCluster(point_estimate);
   cout << "Assessing the value of the radius..."
        << "\n";
 
   while (1) {
-    epsilon += rate * steps;
+    epsilon = epsilon + rate * steps;
+    cout << "Epsilon: " << epsilon << endl;
 
     for (int i = 0; i < T; i++) {
       Eigen::VectorXi vec;
       vec = mcmc_sample.row(i);
-      // transform_row2vec(mcmc_sample.cast<int>(), i, vec);
       loss_function->SetSecondCluster(vec);
-      if (loss_function->Loss() <= epsilon) {
+      double loss = loss_function->Loss();
+      if (loss <= epsilon) {
         probability += 1;
       }
     }
@@ -100,6 +101,7 @@ double CredibleBall::calculateRegion(double rate) {
 
 void CredibleBall::populateCredibleSet() {
   loss_function->SetFirstCluster(point_estimate);
+  // int count = 0;
 
   for (int i = 0; i < T; i++) {
     Eigen::VectorXi vec;
@@ -108,33 +110,29 @@ void CredibleBall::populateCredibleSet() {
     loss_function->SetSecondCluster(vec);
 
     if (loss_function->Loss() <= radius) {
-      cout << "populateCredibleSet1" << endl;
-      // credibleBall[i] = mcmc_sample.row(i);
-      for (int j = 0; j < N; j++) {
-        credibleBall(i, j) = mcmc_sample(i, j);
-      }
+      // cout << "populateCredibleSet1" << endl;
+      // save the index of cluster belonging to the credible-ball
+      credibleBall.insert(i);
     }
   }
+
   cout << "Intern data populated" << endl;
-  cout << "Matrix of credible ball: (" << credibleBall.rows() << ", "
-       << credibleBall.cols() << ")" << endl;
+  cout << "Size of credible ball: (" << credibleBall.size() << ")" << endl;
 
   return;
 }
 
 int CredibleBall::count_cluster_row(int row) {
-  // Returns the number of partitions in a specified row of the credible ball
-  int total_row = credibleBall.rows();
-  if (row > total_row) {
+  // Returns the number of partitions in a specified row of the mcmc_sample
+  if (row > T) {
     cout << "Row out of bounds!" << endl;
     return -1;
   }
 
-  int col = credibleBall.cols();
   set<int, greater<int>> s;
 
-  for (int i = 0; i < col; i++) {
-    int tmp = credibleBall(row, i);
+  for (int i = 0; i < N; i++) {
+    int tmp = mcmc_sample(row, i);
     s.insert(tmp);
   }
 
@@ -143,17 +141,16 @@ int CredibleBall::count_cluster_row(int row) {
 
 //* clusters with min cardinality that are as distant as possible from the
 //* center
-Eigen::MatrixXi CredibleBall::VerticalUpperBound() {
-  Eigen::VectorXi vec1, vec2;
-  // vec1 has the indexes of the clusters with minimum cardinality in the ball
-  // vec2 is an auxiliary vector
-  Eigen::MatrixXi vub;             // the output
-  int rows = credibleBall.rows();  // size of the credible ball
+Eigen::VectorXi CredibleBall::VerticalUpperBound() {
+  set<int, greater<int>> vec1;  // vec1 is for saving the indexes of clusters
+                                // that have min cardinality
+  Eigen::VectorXi vec2;         // vec2 is an auxiliary vector
+  set<int, greater<int>> vub;
   int tmp1;
   int min = INT_MAX;
 
   // find the minimal cardinality among the clusters
-  for (int i = 0; i < rows; i++) {
+  for (auto i : credibleBall) {
     tmp1 = count_cluster_row(i);
     if (tmp1 <= min) {
       min = tmp1;
@@ -161,22 +158,20 @@ Eigen::MatrixXi CredibleBall::VerticalUpperBound() {
   }
 
   // save the indexes of the clusters with min cardinality
-  int aux1 = 0;
-  for (int i = 0; i < rows; i++) {
+  for (auto i : credibleBall) {
     if (count_cluster_row(i) == min) {
-      vec1(aux1) = i;
-      aux1++;
+      vec1.insert(i);
     }
   }
 
   // among the clusters with min cardinality find the max distance
   // from the point_estimate
   double max_distance = -1.0;
-  for (int i = 0; i < vec1.size(); i++) {
-    loss_function->SetFirstCluster(point_estimate);
-    // we save the row "vec(j)" of the credibleBall in vec2
-    //  transform_row2vec(credibleBall, vec1(i), vec2);
+  for (auto i : vec1) {
+    // we save the row "vec(i)" of the credibleBall in vec2
     // compute the distance, ie the loss for the corresponding row
+    loss_function->SetFirstCluster(point_estimate);
+    vec2 = mcmc_sample.row(i);
     loss_function->SetSecondCluster(vec2);
     double loss = loss_function->Loss();
 
@@ -186,36 +181,42 @@ Eigen::MatrixXi CredibleBall::VerticalUpperBound() {
   }
 
   // save the clusters that are "max_distance" far away from the point estimate
-  int aux = 0;
-  for (int i = 0; i < vec1.size(); i++) {
+  for (auto i : vec1) {
     loss_function->SetFirstCluster(point_estimate);
-    vec2 = credibleBall.row(vec1(i));
-    //  transform_row2vec(credibleBall, vec1(i), vec2);
+    vec2 = mcmc_sample.row(i);
     loss_function->SetSecondCluster(vec2);
     double loss = loss_function->Loss();
 
     if (loss == max_distance) {
-      add_row2matrix(vub, aux, credibleBall, vec1(i));
-      aux++;
+      vub.insert(i);
     }
   }
 
-  return vub;
+  Eigen::VectorXi VUB(vub.size());  // the output
+  int aux = 0;
+  for (auto i : vub) {
+    VUB(aux) = i;
+    aux++;
+  }
+
+  return VUB;
 }
 
 //* clusters with max cardinality that are as distant as possible from the
 //* center
-Eigen::MatrixXi CredibleBall::VerticalLowerBound() {
-  Eigen::VectorXi vec1, vec2;
+Eigen::VectorXi CredibleBall::VerticalLowerBound() {
+  set<int, greater<int>> vec1;
+  Eigen::VectorXi vec2;
   // vec1 has the indexes of the clusters with maximum cardinality in the ball
   // vec2 is an auxiliary vector
-  Eigen::VectorXi vlb;
-  int rows = credibleBall.rows();
+  set<int, greater<int>> vlb;
+
+  // int rows = credibleBall.size();
   int tmp1;
   int max = -1;
 
   // find the maximal cardinality among the clusters
-  for (int i = 0; i < rows; i++) {
+  for (auto i : credibleBall) {
     tmp1 = count_cluster_row(i);
     if (tmp1 >= max) {
       max = tmp1;
@@ -223,21 +224,18 @@ Eigen::MatrixXi CredibleBall::VerticalLowerBound() {
   }
 
   // save the indexes of the clusters with max cardinality
-  int aux1 = 0;
-  for (int i = 0; i < rows; i++) {
+  for (auto i : credibleBall) {
     if (count_cluster_row(i) == max) {
-      vec1(aux1) = i;
-      aux1++;
+      vec1.insert(i);
     }
   }
 
   // among the clusters with max cardinality find the max distance
   // from the point_estimate
   double max_distance = -1.0;
-  for (int i = 0; i < vec1.size(); i++) {
+  for (auto i : vec1) {
     loss_function->SetFirstCluster(point_estimate);
-    vec2 = credibleBall.row(vec1(i));
-    //  transform_row2vec(credibleBall, vec1(i), vec2);
+    vec2 = mcmc_sample.row(i);
     loss_function->SetSecondCluster(vec2);
     double loss = loss_function->Loss();
 
@@ -247,35 +245,36 @@ Eigen::MatrixXi CredibleBall::VerticalLowerBound() {
   }
 
   // save the clusters that are "max_distance" far away from the point estimate
-  int aux = 0;
-  for (int i = 0; i < vec1.size(); i++) {
+  for (auto i : vec1) {
     loss_function->SetFirstCluster(point_estimate);
-    vec2 = credibleBall.row(vec1(i));
-    // transform_row2vec(credibleBall, vec1(i), vec2);
+    vec2 = mcmc_sample.row(i);
     loss_function->SetSecondCluster(vec2);
     double loss = loss_function->Loss();
 
     if (loss == max_distance) {
-      add_row2matrix(vlb, aux, credibleBall, vec1(i));
-      aux++;
+      vlb.insert(i);
     }
   }
 
-  return vlb;
+  Eigen::VectorXi VLB(vlb.size());
+  int aux = 0;
+  for (auto i : vlb) {
+    VLB(aux) = i;
+    aux++;
+  }
+  return VLB;
 }
 
 //* clusters in the credible ball that are more distant from the center
-Eigen::MatrixXi CredibleBall::HorizontalBound() {
-  Eigen::MatrixXi hb;
+Eigen::VectorXi CredibleBall::HorizontalBound() {
+  set<int, greater<int>> hb;
   Eigen::VectorXi vec;
-  int row = credibleBall.rows();
   double max_distance = -1.0;
 
   // find the max distance among all the clusters in the credible ball
-  for (int i = 0; i < row; i++) {
+  for (auto i : credibleBall) {
     loss_function->SetFirstCluster(point_estimate);
-    vec = credibleBall.row(i);
-    // transform_row2vec(credibleBall, i, vec);
+    vec = mcmc_sample.row(i);
     loss_function->SetSecondCluster(vec);
     double loss = loss_function->Loss();
 
@@ -285,19 +284,23 @@ Eigen::MatrixXi CredibleBall::HorizontalBound() {
   }
 
   // select the clusters with that distance
-  int aux1 = 0;
-  for (int i = 0; i < row; i++) {
+  for (auto i : credibleBall) {
     loss_function->SetFirstCluster(point_estimate);
-    vec = credibleBall.row(i);
+    vec = mcmc_sample.row(i);
     // transform_row2vec(credibleBall, i, vec);
     loss_function->SetSecondCluster(vec);
     double loss = loss_function->Loss();
 
     if (loss == max_distance) {
-      add_row2matrix(hb, aux1, credibleBall, vec(i));
-      aux1++;
+      hb.insert(i);
     }
   }
 
-  return hb;
+  Eigen::VectorXi HB(hb.size());
+  int aux = 0;
+  for (auto i : hb) {
+    HB(aux) = i;
+    aux++;
+  }
+  return HB;
 }
