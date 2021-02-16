@@ -28,12 +28,13 @@ class CredibleBall {
                double alpha_, Eigen::VectorXi& point_estimate_);
   ~CredibleBall();
   double calculateRegion(double rate);   // calculate the radius
-  Eigen::VectorXi VerticalUpperBound();  // index of cluusters of the VUB
-  Eigen::MatrixXd VerticalLowerBound();  // index of the clusters of the VLB
-  Eigen::VectorXi HorizontalBound();     // index of the clusters of the HB
+  Eigen::MatrixXi VerticalUpperBound();  // index of cluusters of the VUB
+  Eigen::MatrixXi VerticalLowerBound();  // index of the clusters of the VLB
+  Eigen::MatrixXi HorizontalBound();     // index of the clusters of the HB
 
  private:
   void populateCredibleSet();  // populate the credibleBall
   int count_cluster_row(int index);
 };
 #endif  // CREDIBLE_BALL_HPP
+
